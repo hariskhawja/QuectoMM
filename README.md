@@ -40,4 +40,4 @@ cmake --build build --config Release
 
 Tickers are discovered from `datasets/LOBSTER_SampleFile_<TICKER>_<DATE>_<LEVELS>/`, each folder holding a LOBSTER `*_message_<LEVELS>.csv` and `*_orderbook_<LEVELS>.csv`. Sample files are available from [LOBSTER](https://php.lobsterdata.com/info/DataSamples.php).
 
-Note: not provided as files are too large.
+Note: not provided as files are too large. Create a `/datasets` folder at root of project, then include your downloaded LOBSTER samples into that directory (simply drag the folder right into it).
