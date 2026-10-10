@@ -44,6 +44,11 @@ build/
 Build/
 build-*/
 
+# Ninja files from an in-source configure
+build.ninja
+.ninja_deps
+.ninja_log
+
 # CMake generated files
 CMakeFiles/
 CMakeCache.txt
@@ -67,3 +72,7 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+context/
+datasets/
+docs/
