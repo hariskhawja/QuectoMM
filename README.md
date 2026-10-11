@@ -1,10 +1,12 @@
-# QuectoMM
+# QuectoMM (In Progress)
 
 A discrete-event market-making research engine. QuectoMM replays historical
 LOBSTER order-level events, reconstructs the limit order book to full
 (order-by-order) depth, and uses it to study how microstructure signals affect
 inventory-aware market making under event-driven execution, queue-position, and
 transaction-cost constraints.
+
+**Todo:** ablation study on the marginal impacts of microstructure signals on an **Avellaneda-Stoikov** market-making strategy. 
 
 ---
 
