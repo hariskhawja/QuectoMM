@@ -8,9 +8,9 @@ transaction-cost constraints.
 
 ---
 
-## 1. Engineering overview
+## 1. Engineering Overview
 
-### What it does
+### What It Does
 
 The engine reconstructs an exchange's **Level-3 (order-by-order) limit order
 book** by replaying LOBSTER message events, then validates that reconstruction
@@ -40,7 +40,7 @@ against LOBSTER's own ground-truth order-book snapshots, event for event.
                                         PASS/FAIL + agreement metrics (CSV)
 ```
 
-### Reconstruction methodology
+### Reconstruction Methodology
 
 LOBSTER level-10 files only contain events inside the top 10 price levels, so
 orders resting deeper are invisible until their price moves into view. Replaying
@@ -59,35 +59,47 @@ QuectoMM handles this with two ideas:
 
 This keeps the Level-2 (aggregate depth) view **exactly** equal to ground truth
 while preserving as much real order-by-order structure as the data allows. The
-unknown fraction is measured, not hidden (see "Genesis share" below), because it
-is exactly the quantity a queue-position model must reason about.
+unknown fraction is measured as it
+is the quantity a queue-position model must reason about.
 
-### Headline validation metrics
+### Headline Validation Metrics
 
-Reconstruction validated event-for-event against LOBSTER ground truth across all
-five NASDAQ sample tickers (AAPL, AMZN, GOOG, INTC, MSFT), 2012-06-21,
+The meaningful measure of reconstruction quality is **how close the book is
+*before* each row is reconciled to the snapshot** — i.e. how much the message
+replay plus Genesis model gets right on its own. (Post-reconciliation the Level-2
+book equals ground truth *by construction*, since reconciliation forces each
+visible level to the snapshot size; that is by design.)
+
+All metrics below are measured **before reconciliation**, after each event is
+applied on top of an already-reconciled previous row — so they capture the error
+introduced by one event, not drift accumulated over the day. Across all five
+NASDAQ sample tickers (AAPL, AMZN, GOOG, INTC, MSFT), 2012-06-21,
 **~2.1 million events total**:
 
-| Ticker | Events | Best bid / ask price agreement | Depth error | Genesis share at touch (bid/ask) |
-|--------|--------|--------------------------------|-------------|----------------------------------|
-| AAPL   | 400,391 | 99.94% / 99.96% | 0.18% | 15.2% / 7.0% |
-| AMZN   | 269,748 | 99.97% / 99.98% | 0.25% | 6.8% / 2.4% |
-| GOOG   | 147,916 | 99.95% / 99.99% | 0.29% | 7.8% / 2.1% |
-| INTC   | 624,040 | 100.0% / 100.0% | 0.00% | 1.6% / 0.0% |
-| MSFT   | 668,765 | 100.0% / 100.0% | 0.00% | 0.5% / 0.0% |
+| Ticker | Events | Rows correct from messages alone | Best bid / ask price agreement | Depth error | Genesis share at touch (bid/ask) |
+|--------|--------|----------------------------------|--------------------------------|-------------|----------------------------------|
+| AAPL   | 400,391 | 95.75% | 99.94% / 99.96% | 0.18% | 15.2% / 7.0% |
+| AMZN   | 269,748 | 95.27% | 99.97% / 99.98% | 0.25% | 6.8% / 2.4% |
+| GOOG   | 147,916 | 95.44% | 99.95% / 99.99% | 0.29% | 7.8% / 2.1% |
+| INTC   | 624,040 | 99.61% | 100.0% / 100.0% | 0.00% | 1.6% / 0.0% |
+| MSFT   | 668,765 | 99.46% | 100.0% / 100.0% | 0.00% | 0.5% / 0.0% |
 
+- **Rows correct from messages alone** — share of events after which the book
+  already matched the snapshot *before* reconciliation touched it. This is the
+  headline number: pure message-driven correctness.
 - **Best price agreement** — how often the reconstructed best bid/ask matches
   ground truth after a single event, before that row's reconciliation.
-- **Depth error** — total share mismatch across the visible book as a fraction
-  of true visible depth.
+- **Depth error** — total share mismatch across the visible book, before
+  reconciliation, as a fraction of true visible depth. (The near-0% on INTC/MSFT
+  reflects their very high pre-reconciliation accuracy.)
 - **Genesis share at touch** — fraction of volume at the best price whose
   individual orders are unknown; the part a queue model must make assumptions
-  about. It varies strongly intraday (AAPL bid: 1–33% across the day).
+  about. Measured after reconciliation (it is a property of the matched book),
+  and it varies strongly intraday (AAPL bid: 1–33% across the day).
 
-All five tickers reconstruct every row exactly after reconciliation; 95–99.6% of
-rows already match from messages alone, before reconciliation. Full column
-definitions are in [`metrics/engineering/README.md`](metrics/engineering/README.md);
-the analysis notebook is `metrics/engineering/model_analysis.ipynb`.
+Full column definitions are in
+[`metrics/engineering/README.md`](metrics/engineering/README.md); the analysis
+notebook is `metrics/engineering/model_analysis.ipynb`.
 
 ### Layout
 
@@ -100,9 +112,25 @@ apps/            qmm_replay — the validation/metrics driver
 metrics/engineering/   agreement CSVs + analysis notebook
 ```
 
+### Limitations
+- **Post-reconciliation L2 match is by design, not a result.** Reconciliation
+  forces each visible level to the snapshot, so exact Level-2 agreement is
+  guaranteed. The reconstruction's quality lives in the *pre*-reconciliation
+  numbers above (rows correct from messages alone, best-price agreement).
+- **Narrow data.** A single trading day (2012-06-21), five large-cap NASDAQ
+  tickers, top-10 depth only. Results are not claimed to generalize across time,
+  regimes, instruments, or deeper books.
+- **Unknown liquidity is aggregated.** Genesis volume is modelled as one block
+  per level, not as individual orders, so order-by-order structure is only known
+  for liquidity observed during the session. The unknown fraction is measured
+  (Genesis share) rather than assumed away.
+- **Ghost removal uses an oldest-first heuristic.** When a tracked order dies out
+  of view, reconciliation removes volume front-first; this is a documented
+  assumption, measured but not independently verifiable from the data.
+
 ---
 
-## 2. Build and run
+## 2. Build and Run
 
 ### Requirements
 
@@ -131,7 +159,7 @@ Output is colourised in an interactive terminal and plain when redirected to a f
 
 `run` and `all` exit with code 0 when every ticker matches the LOBSTER ground truth and 1 otherwise. They also write per-5-minute agreement metrics (best bid/ask agreement, depth error, Genesis share at the touch) to `metrics/engineering/<TICKER>_agreement.csv`; the column layout is described in [`metrics/engineering/README.md`](metrics/engineering/README.md).
 
-### Without the scripts
+### Without The Scripts
 
 ```
 cmake -S . -B build

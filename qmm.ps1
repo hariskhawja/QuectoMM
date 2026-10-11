@@ -37,7 +37,7 @@ if (-not $env:NO_COLOR -and $qmmInteractive) {
 
 function Invoke-Configure {
     if (Test-Path (Join-Path $BuildDir "CMakeCache.txt")) { return }
-    $cmakeArgs = @("-S", $Root, "-B", $BuildDir)
+    $cmakeArgs = @("-S", $Root, "-B", $BuildDir, "-DCMAKE_BUILD_TYPE=Release")
     # Ninja is optional; use it when installed, otherwise CMake picks a default.
     if (Get-Command ninja -ErrorAction SilentlyContinue) { $cmakeArgs += @("-G", "Ninja") }
     Write-Host "Configuring: cmake $($cmakeArgs -join ' ')"
@@ -64,7 +64,10 @@ function Get-Exe {
 
 function Get-ExeOrBuild {
     $exe = Get-Exe
-    if (-not $exe) { Invoke-Build; $exe = Get-Exe }
+    if (-not $exe) {
+        Invoke-Build | Out-Host
+        $exe = Get-Exe
+    }
     if (-not $exe) { throw "qmm_replay executable not found after build." }
     return $exe
 }
