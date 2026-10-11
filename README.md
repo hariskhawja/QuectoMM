@@ -21,13 +21,13 @@ against LOBSTER's own ground-truth order-book snapshots, event for event.
  (every add/cancel/exec)                         (true L2 depth per row)
         │                                                  │
         ▼                                                  │
- ┌──────────────┐    ┌──────────────────────────┐         │
+ ┌──────────────┐    ┌────────────────────────────┐        │
  │   parser     │──▶ │        OrderBook (L3)      │        │
  │ CSV → events │    │  bids/asks  : price levels │        │
  └──────────────┘    │  per level  : FIFO queue   │        │
         │            │  id index   : O(1) lookup  │        │
         ▼            │  genesis    : unknown vol  │        │
- ┌──────────────┐    └──────────────────────────┘         │
+ ┌──────────────┐    └────────────────────────────┘        │
  │    replay    │              │                           │
  │  event loop  │──────────────┘                           ▼
  └──────────────┘           per row ───▶ ┌────────────────────────────┐
